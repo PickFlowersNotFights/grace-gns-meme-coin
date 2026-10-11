@@ -891,7 +891,7 @@ def s6(ctx, t):
     d.line([(phx, oy - 8 * u), (phx, oy + oh + 8 * u)], fill=WHITE, width=max(1, int(3 * u)))
     # step body
     by0 = oy + oh + 40 * u
-    by1 = H * (0.74 if not P else 0.70)
+    by1 = H * (0.74 if not P else 0.56)
     body = [_step1, _step2, _step3, _step4][si]
     img = body(ctx, img, t, lt, (60 * u, by0, W - 60 * u, by1), col)
     d = ImageDraw.Draw(img)

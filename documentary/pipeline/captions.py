@@ -62,7 +62,7 @@ def burner(caps):
         fnt = ctx.f("black", 54)
         lines = wrap(fnt, cur[0], ctx.W * 0.84)
         lh = 66 * u
-        y0 = ctx.H * 0.70
+        y0 = ctx.H * 0.78
         d = ImageDraw.Draw(img)
         for i, ln in enumerate(lines):
             w = fnt.getlength(ln)
