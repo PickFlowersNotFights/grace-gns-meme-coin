@@ -672,7 +672,17 @@ def s5(ctx, t):
     img = title_block(ctx, img, t, 95.4, 101.0, "BIG BEACH BOUTIQUE II · 2002", "BRIGHTON BEACH, ~250,000 PEOPLE",
                       size=64 if not ctx.portrait else 54)
     img = _charts(ctx, img, t)
+    if t > 116.0:                                   # slow push-in so data holds never sit static
+        img = push(img, 1 + 0.06 * ease_io((t - 116.0) / 19.0))
     return img
+
+
+def push(img, z):
+    if z <= 1.0005:
+        return img
+    W, H = img.size
+    w, h = W / z, H / z
+    return img.resize((W, H), Image.BICUBIC, box=((W - w) / 2, (H - h) / 2, (W + w) / 2, (H + h) / 2))
 
 
 def _beach(ctx, t):
@@ -1113,6 +1123,7 @@ def _title_card(ctx, t):
         fnt = ctx.f("mono_r", 19 if not ctx.portrait else 17)
         for i, ln in enumerate(wrap(fnt, C.DISCLAIMER, W * 0.8)):
             d.text((W / 2, H * 0.82 + i * 28 * u), ln, font=fnt, fill=mixc((250, 248, 242), (70, 70, 76), a2), anchor="mm")
+    img = push(img, 1 + 0.05 * clamp((t - 258.5) / 11.5))
     # fade to black at the very end
     fade = clamp((t - (C.DURATION - 0.75)) / 0.75)
     if fade > 0:

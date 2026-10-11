@@ -30,7 +30,8 @@ def _ff_filter_log(path, vf=None, af=None, extra=()):
 
 
 def check_video(path, W, H, dur, fps=C.FPS, audio_tracks=1, subs=False, black_max=1.0, freeze_max=2.5,
-                allow_black_at=((34.4, 35.05),)):
+                allow_black_at=((0.0, 1.65), (34.4, 35.05))):
+    # 0-1.6 s: brief's 'black screen, pulsing VU meter' cold open; 34.45-35 s: the withheld drop
     res = []
     p = probe(path)
     vs = [s for s in p["streams"] if s["codec_type"] == "video"]

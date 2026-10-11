@@ -10,6 +10,7 @@ from .synth import SR, n
 
 STEREO_LUFS, STEREO_TP = -14.0, -1.0       # streaming / social spec
 SURROUND_LUFS, SURROUND_TP = -24.0, -2.0   # broadcast-style 5.1 bed
+VO_MARGIN_DB = 13.0                       # dialogue-over-bed target during VO lines
 
 
 # ------------------------------------------------------------------ measurement
@@ -112,12 +113,25 @@ def mixdown(music, sfx, vo_items, out_dir, log=print):
     music, sfx = music[:N], sfx[:N]
     vo, act = vo_bus(vo_items)
 
-    duck_m = 1 - act * (1 - 10 ** (-10 / 20))     # music -10 dB under dialogue
-    duck_s = 1 - act * (1 - 10 ** (-6 / 20))      # sfx -6 dB
-    bed = music * duck_m[:, None] + sfx * duck_s[:, None]
-    bed = compress(bed, -16, 2.0, 0.012, 0.2)
-    vo_st = np.stack([vo, vo], axis=1) * 0.9
-    mix = bed * 0.55 + vo_st
+    # level-aware ducking: per VO line, duck the bed just enough for a fixed dialogue margin
+    bed0 = compress(music + sfx, -16, 2.0, 0.012, 0.2)
+    rms = lambda x: np.sqrt(np.mean(x ** 2) + 1e-12)
+    vo_lvl = rms(vo[act > 0.5])
+    g = vo_lvl * 10 ** (-1.0 / 20) / rms(bed0[np.abs(bed0).max(axis=1) > 1e-4])   # unducked bed ≈ VO -1 dB
+    bed0 = bed0 * g
+    duck_db = np.zeros(N)
+    for it in vo_items:
+        a, b = n(it["start"]), min(N, n(it["end"]))
+        margin = 20 * np.log10(rms(vo[a:b]) / rms(bed0[a:b]))
+        depth = float(np.clip(VO_MARGIN_DB - margin, 6.0, 30.0))
+        w = np.zeros(N)
+        w[max(0, a - n(0.25)): min(N, b + n(0.35))] = 1.0
+        w = uniform_filter1d(w, n(0.36))
+        duck_db = np.maximum(duck_db, w * depth)
+        log(f"    duck {it['cue'].id}: {depth:4.1f} dB")
+    bed = bed0 * (10 ** (-duck_db / 20))[:, None]
+    vo_st = np.stack([vo, vo], axis=1)
+    mix = bed + vo_st
 
     stereo = master(mix, STEREO_LUFS, STEREO_TP)
     m_l, m_tp = lufs(stereo), true_peak_db(stereo)
@@ -128,7 +142,7 @@ def mixdown(music, sfx, vo_items, out_dir, log=print):
     lfe = S.lp(bed_m, 110, 4) * 1.9 + S.lp(bed_m, 50, 2) * 0.6
     front = S.hp(bed[:, 0], 60), S.hp(bed[:, 1], 60)
     amb = S.reverb(S.hp(bed_m, 180), 2.2, 1.0, 5000, stereo_out=True)
-    sfx_s = sfx * duck_s[:, None]
+    sfx_s = sfx * g * (10 ** (-duck_db / 20))[:, None]
     surr_l = amb[:, 0] * 0.35 + np.roll(sfx_s[:, 0], n(0.012)) * 0.5
     surr_r = amb[:, 1] * 0.35 + np.roll(sfx_s[:, 1], n(0.017)) * 0.5
     six = np.stack([front[0] * 0.55, front[1] * 0.55, vo * 1.25 + bed_m * 0.08, lfe * 0.5, surr_l * 0.55, surr_r * 0.55], axis=1)
